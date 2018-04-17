@@ -1,0 +1,24 @@
+{
+  "name": "bamazon",
+  "version": "1.0.0",
+  "description": "Bamazon Node,js CLI with MySQL",
+  "main": "bamazonCustomer.js",
+  "scripts": {
+    "test": "Node bamazonCustomer.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GC-RU-bootcamp/Bamazon.git"
+  },
+  "author": "Gary Cender",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/GC-RU-bootcamp/Bamazon/issues"
+  },
+  "homepage": "https://github.com/GC-RU-bootcamp/Bamazon#readme",
+  "dependencies": {
+    "dotenv": "^5.0.1",
+    "inquirer": "^5.2.0",
+    "mysql": "^2.15.0"
+  }
+}
