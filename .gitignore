@@ -12,9 +12,10 @@ node_modules
 # misc
 .DS_Store
 .env
-AWS.env
-localhost.env
+.env*
 *.env
+.env.localhost.env
+.env.AWS.env
 *.xlsx
 server/.env
 npm-debug.log*

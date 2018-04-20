@@ -64,3 +64,5 @@ values
 select * from products;
 
 
+SELECT item_id, product_name, price FROM products WHERE department_name = "Photography & Videography";
+

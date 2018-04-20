@@ -45,8 +45,10 @@ function queryCategories() {
   );
 } // queryCategories
 
+var products = [];
+
 function queryDeptProducts(dept) {
-  var products = [];
+  
   p = {};
   var query = connection.query(
     "SELECT item_id, product_name, price, stock_quantity FROM products where department_name = ?",
@@ -75,13 +77,28 @@ var Prod = function(id, name, price, qty) {
   this.price = price;
   this.qty = qty;
   this.showItem = function() {
-    return this.id + ") " + this.name + ",  $" + this.price;
+    return this.id + ") " + (this.name+",                   ").slice(0,20) + " $" + (this.price+",         ").slice(0,10)  +  +  this.qty + " in stock";
   };
-  this.getIdFromAns = function(str) {
-    var arr = str.split(")");
-    return parseInt(arr[0]);
-  };
+  
 };
+
+function getIdFromAns(str) {
+  var id = -1;
+  var arr = str.split(")");
+  var id = parseInt(arr[0]);
+  return id ;
+};
+
+function myFindIndexById(list, id) {
+  var retval = -1;
+  for (let i = 0; i < list.length; i++) {
+    if (id === list[i].id) {
+      retval = i;
+      break;
+    }
+  }
+  return retval;
+}
 
 // function which prompts the user for what action they should take
 function whichDept(depts) {
@@ -111,6 +128,77 @@ function productDisplayList(products) {
 
 // function which prompts the user for what action they should take
 function whichProduct(products) {
+  var product = "";
+  inquirer
+    .prompt([
+      {
+        name: "product",
+        type: "list",
+        pageSize: products.length,
+        message: "What product would like to buy?",
+        choices: productDisplayList(products)
+      },
+      {
+        name: "qty",
+        type: "input",
+        message: "How many would like to buy? ", //+ products[Prod.getIdFromAns(product)].qty,
+        validate: function(value) {
+          // var pass = value.match(
+          //   /^([01]{1})?[-.\s]?\(?(\d{3})\)?[-.\s]?(\d{3})[-.\s]?(\d{4})\s?((?:#|ext\.?\s?|x\.?\s?){1}(?:\d+)?)?$/i
+          // );
+          if (parseInt(value) > -1) {
+            return true;
+          }
+    
+          return 'Please enter a valid number';
+        }
+      }
+    ])
+    .then(function(answer) {
+      product = answer.product;
+      console.log(product);
+      console.log(answer.qty);
+      var item_id = getIdFromAns(product);
+      var index = myFindIndexById(products, item_id);
+      // out of stock?
+      if (products[index].qty < parseInt(answer.qty)){
+          console.log("Sorry, There is only "+ products[index].qty + " in stock \n")
+          //changeQtyPrompt(products, index, qty);
+          whichProduct(products)
+      } 
+      // chose zero qty then query for new product
+      else if (parseInt(answer.qty) === 0 ) {
+        console.log("Okay. nothing purchased");
+        console.log("Lets try again\n");
+        while(products.length){
+          products.pop();
+        }
+        products = [];
+        queryCategories();
+      } else {
+        // deduct qty from stock;
+        console.log("Purchase:");
+        console.log("  Qty "+ answer.qty + ") '"+ products[index].name +"' at $"+ products[index].price + " each");
+        console.log("  Total: :" + parseInt(answer.qty) * products[index].price+"\n\n");
+        while(products.length){
+          products.pop();
+        }
+        products = [];
+        queryCategories();
+      }
+
+        
+      // based on their answer, either call the bid or the post functions
+      // if (answer.postOrBid.toUpperCase() === "POST") {
+      //   postAuction();
+      // }
+      // else {
+      //   bidAuction();
+      // }
+    });
+} //start
+
+function changeQtyPrompt(products, index, qty) {
   var product = "";
   inquirer
     .prompt([
