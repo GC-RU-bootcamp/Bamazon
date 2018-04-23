@@ -8,8 +8,23 @@ var Product = require("./Product");
 var Products = require("./Products");
 
 var products = new Products();
-if (process.argv[1] === "bamazonManager.js"){
+var choices =[];
+if (process.argv[1].includes("bamazonManager.js")) {
   products.managerMode = true;
+  choices = [
+    "View Products for Sale",
+    "View Low Inventory",
+    "Add to Inventory",
+    "Add New Product"
+  ];
+}
+
+if (process.argv[1].includes("bamazonSupervisor.js")) {
+  products.supervisorMode = true;
+  choices = [
+    "View Product Sales by Department",
+    "Create New Department",
+  ]
 }
 
 var db_connect_info = {
@@ -25,6 +40,8 @@ function welcomeMsg() {
   console.log("-------- Welcome to Bamazon! -----------");
   if (products.managerMode)
     console.log("---------- Manager access --------------");
+  if (products.supervisorMode)
+    console.log("--------- Supervisor access ------------");
   console.log("----------------------------------------\n");
 }
 
@@ -36,27 +53,23 @@ connection.connect(function(err) {
   if (err) throw err;
   // run the start function after the connection is made to prompt the user
   welcomeMsg();
-  if (products.managerMode) {
-    actionPrompt();
+  if (products.supervisorMode) {
+    actionPrompt(choices);
+  } else if (products.managerMode) {
+    actionPrompt(choices);
   } else {
     queryCategories();
   }
-
 });
 
-var actionPrompt = function() {
+var actionPrompt = function(choices) {
   inquirer
     .prompt([
       {
         name: "activity",
         type: "list",
         message: "What do you want to do?",
-        choices: [
-          "View Products for Sale",
-          "View Low Inventory",
-          "Add to Inventory",
-          "Add New Product"
-        ]
+        choices: choices
       }
     ])
     .then(function(activityPicked) {
@@ -75,10 +88,41 @@ var actionPrompt = function() {
           queryCategories(promptAddProduct);
           // whichDept(depts, ());
           break;
+        case "View Product Sales by Department":
+          queryReport(query, actionPrompt, choices);
+          break;
+        case "Create New Department":
+          queryCategories(promptAddProduct);
+          break;
       }
     });
 };
 
+var actionSuperPrompt = function() {
+  inquirer
+    .prompt([
+      {
+        name: "activity",
+        type: "list",
+        message: "What do you want to do?",
+        choices: [
+          "View Product Sales by Department",
+          "Create New Department",
+        ]
+      }
+    ])
+    .then(function(activityPicked) {
+      /* Use switch case to determine what method we'll be running */
+      switch (activityPicked.activity) {
+        case "View Product Sales by Department":
+          querySalesSummary();
+          break;
+        case "Create New Department":
+          queryLowStock();
+          break;
+      }
+    });
+};
 function queryCategories(nextFunc) {
   var depts = [];
   var query = connection.query(
@@ -106,7 +150,6 @@ function queryCategories(nextFunc) {
 //var products = [];
 
 function queryDeptProducts(dept) {
-  
   products.emptyList();
   var query = connection.query(
     "SELECT item_id, product_name, department_name, price, stock_quantity," +
@@ -201,10 +244,10 @@ function queryProductUpdate(product, nextFunc, params) {
 function queryProductCreate(product, nextFunc, params) {
   var depts = [];
   var query = connection.query(
-    "INSERT INTO products " 
-    // + "(product_name, department_name, price,stock_quantity, stock_limit, restock_quanity, stock_sold, gross_revenue)"
-    // + " values (?) ",
-    + " set ? ",
+    "INSERT INTO products " +
+      // + "(product_name, department_name, price,stock_quantity, stock_limit, restock_quanity, stock_sold, gross_revenue)"
+      // + " values (?) ",
+      " set ? ",
     [
       {
         product_name: product.name,
@@ -215,12 +258,18 @@ function queryProductCreate(product, nextFunc, params) {
         restock_quanity: product.restockQty,
         stock_sold: product.qtySold,
         gross_revenue: product.grossRevenue
-      },
+      }
     ],
 
     function(err, res) {
       if (err) throw err;
-      console.log("Created new product '" + product.name + "' with id:"+res.insertId+"\n");
+      console.log(
+        "Created new product '" +
+          product.name +
+          "' with id:" +
+          res.insertId +
+          "\n"
+      );
       // for (var i = 0; i < res.length; i++) {
       //   // console.log("- "+ res[i].department_name);
       //   depts.push(res[i].department_name);
@@ -493,9 +542,46 @@ function promptAddProduct(dept, choices) {
         answer.maxQty,
         answer.restockQty,
         0, // qtySold,
-        0, //grossRevenue
+        0 //grossRevenue
       );
       queryProductCreate(p, actionPrompt);
-
     });
 } //promptAddProduct
+
+
+var query = "select department_name,"  
++ "sum(stock_quantity * price) as over_head_costs,"  
++ "sum(gross_revenue) as product_sales,"  
++ "sum(gross_revenue) - sum(stock_quantity * price) as total_profit"
++ "from products"
++ "group by department_name";
+
+function queryReport(query, nextFunc, params) {
+  var p = {};
+  products.emptyList();
+  var query = connection.query(
+    query,
+    // "SELECT item_id, product_name, department_name, price, stock_quantity," +
+    //   "stock_limit, restock_quanity, stock_sold, gross_revenue FROM products where stock_quantity <= restock_quanity",
+    [],
+    function(err, res) {
+      var pad=",                      "
+      if (err) throw err;
+      for (var i = 0; i < res.length; i++) {
+       console.log(
+          (res[i].department_name + pad).slice(0,15) +
+          (res[i].over_head_costs + pad).slice(0,15) +
+          (res[i].product_sales + pad).slice(0,15) +
+          (res[i].total_profit +pad).slice(0,15) 
+        );
+      }
+      if (nextFunc){
+        if (params){
+          nextFunc(params);
+        } else {
+          nextFunc();
+        }
+      }
+    }
+  );
+} // queryReport
