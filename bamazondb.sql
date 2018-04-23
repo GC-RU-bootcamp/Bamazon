@@ -11,6 +11,7 @@ create table products (
   product_name VARCHAR(100) NOT NULL,
   /*--(Name of product)*/
   department_name VARCHAR(45) NULL,
+  /*--(Name of depatment)*/
   price DECIMAL(10,2) not null,
   /*--(cost to customer)*/
   stock_quantity INT NOT NULL,
@@ -24,6 +25,19 @@ create table products (
   gross_revenue DECIMAL(10,2) not null,
   /*--(total $ amount of the product sold)*/
   PRIMARY KEY (item_id)
+);
+
+
+use bamazon;
+
+create table departments (
+  department_id INT NOT NULL AUTO_INCREMENT,
+   /*(unique id for each product)*/
+  department_name VARCHAR(45) NULL,
+  /*--(Name of depatment)*/
+  over_head_costs DECIMAL(10,2) not null,
+  /*--(total $ amount of the over head costs)*/
+  PRIMARY KEY (department_id)
 );
 
 

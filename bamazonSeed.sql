@@ -1,3 +1,5 @@
+use bamazon;
+
 truncate table products;
 
 insert into products 
@@ -47,7 +49,22 @@ values
 
 ;
 
+use bamazon;
+
+truncate table products;
+
+insert departments (department_name, over_head_costs )values
+('Computers & Accessories       ', 13614.44),
+('Home Entertainment            ', 49066),
+('Photography & Videography     ', 10212.85),
+('Video Games                   ', 23.99)
+;
+
+
 select * from products;
+
+select * from departments;
+
 
 
 SELECT item_id, product_name, price FROM products WHERE department_name = "Photography & Videography";

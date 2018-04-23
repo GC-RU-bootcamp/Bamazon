@@ -8,7 +8,11 @@ var Product = require("./Product");
 var Products = require("./Products");
 
 var products = new Products();
-var choices =[];
+var choices = [];
+var rootMenu = function() {
+  queryDepartments();
+};
+
 if (process.argv[1].includes("bamazonManager.js")) {
   products.managerMode = true;
   choices = [
@@ -17,14 +21,25 @@ if (process.argv[1].includes("bamazonManager.js")) {
     "Add to Inventory",
     "Add New Product"
   ];
+  rootMenu = function() {
+    actionPrompt(choices);
+  };
 }
 
 if (process.argv[1].includes("bamazonSupervisor.js")) {
+  products.managerMode = true;
   products.supervisorMode = true;
   choices = [
     "View Product Sales by Department",
     "Create New Department",
-  ]
+    "View Products for Sale",
+    "View Low Inventory",
+    "Add to Inventory",
+    "Add New Product"
+  ];
+  rootMenu = function() {
+    actionPrompt(choices);
+  };
 }
 
 var db_connect_info = {
@@ -38,10 +53,11 @@ var db_connect_info = {
 function welcomeMsg() {
   console.log("----------------------------------------");
   console.log("-------- Welcome to Bamazon! -----------");
-  if (products.managerMode)
-    console.log("---------- Manager access --------------");
-  if (products.supervisorMode)
+  if (products.supervisorMode) {
     console.log("--------- Supervisor access ------------");
+  } else if (products.managerMode) {
+    console.log("---------- Manager access --------------");
+  }
   console.log("----------------------------------------\n");
 }
 
@@ -53,13 +69,7 @@ connection.connect(function(err) {
   if (err) throw err;
   // run the start function after the connection is made to prompt the user
   welcomeMsg();
-  if (products.supervisorMode) {
-    actionPrompt(choices);
-  } else if (products.managerMode) {
-    actionPrompt(choices);
-  } else {
-    queryCategories();
-  }
+  rootMenu();
 });
 
 var actionPrompt = function(choices) {
@@ -76,20 +86,19 @@ var actionPrompt = function(choices) {
       /* Use switch case to determine what method we'll be running */
       switch (activityPicked.activity) {
         case "View Products for Sale":
-          queryCategories();
+          queryDepartments();
           break;
         case "View Low Inventory":
           queryLowStock();
           break;
         case "Add to Inventory":
-          queryCategories();
+          queryDepartments();
           break;
         case "Add New Product":
-          queryCategories(promptAddProduct);
-          // whichDept(depts, ());
+          queryDepartments("list", promptAddProduct);
           break;
         case "View Product Sales by Department":
-          queryReport(query, actionPrompt, choices);
+          queryReport(query, rootMenu, choices);
           break;
         case "Create New Department":
           promptAddDept(promptAddProduct);
@@ -98,8 +107,12 @@ var actionPrompt = function(choices) {
     });
 };
 
-function queryCategories(nextFunc) {
+function queryDepartments(listType, nextFunc) {
   var depts = [];
+  var listParam = "checkbox";
+  if (listType) {
+    listParam = listType;
+  }
   var query = connection.query(
     "SELECT distinct department_name FROM products ",
     [],
@@ -114,13 +127,13 @@ function queryCategories(nextFunc) {
         }
       }
       if (nextFunc) {
-        whichDept(depts, nextFunc);
+        promptDept(depts, listParam, nextFunc);
       } else {
-        whichDept(depts);
+        promptDept(depts, listParam);
       }
     }
   );
-} // queryCategories
+} // queryDepartments
 
 //var products = [];
 
@@ -146,7 +159,7 @@ function queryDeptProducts(dept) {
         );
         products.addProduct(p);
       }
-      whichProduct(products);
+      promptProduct(products);
     }
   );
 } // queryDeptProducts
@@ -199,15 +212,9 @@ function queryProductUpdate(product, nextFunc, params) {
         item_id: product.id
       }
     ],
-
     function(err, res) {
       if (err) throw err;
-      console.log("DB updated\n");
-      // for (var i = 0; i < res.length; i++) {
-      //   // console.log("- "+ res[i].department_name);
-      //   depts.push(res[i].department_name);
-      // }
-      // whichDept(depts);
+      console.log("DB updated product ID=" + product.id + "\n");
       if (nextFunc) {
         if (params) nextFunc(params);
         else nextFunc();
@@ -235,7 +242,6 @@ function queryProductCreate(product, nextFunc, params) {
         gross_revenue: product.grossRevenue
       }
     ],
-
     function(err, res) {
       if (err) throw err;
       console.log(
@@ -245,11 +251,6 @@ function queryProductCreate(product, nextFunc, params) {
           res.insertId +
           "\n"
       );
-      // for (var i = 0; i < res.length; i++) {
-      //   // console.log("- "+ res[i].department_name);
-      //   depts.push(res[i].department_name);
-      // }
-      // whichDept(depts);
       if (nextFunc) {
         if (params) nextFunc(params);
         else nextFunc();
@@ -267,30 +268,37 @@ function queryReport(query, nextFunc, params) {
     //   "stock_limit, restock_quanity, stock_sold, gross_revenue FROM products where stock_quantity <= restock_quanity",
     [],
     function(err, res) {
-      var pad="                      "
+      var pad = "                      ";
       if (err) throw err;
       console.log(
-        ("Department Name" + pad).slice(0,30) +
-          ("Over head costs" + pad).slice(0,18) +
-          ("Product sales" + pad).slice(0,18) +
-          ("Total profit" +pad).slice(0,18) 
+        ("Department Name" + pad).slice(0, 30) +
+          ("Over head costs" + pad).slice(0, 18) +
+          ("Product sales" + pad).slice(0, 18) +
+          ("Total profit" + pad).slice(0, 18)
       );
       console.log(
-        ("---------------" + pad).slice(0,30) +
-          ("---------------" + pad).slice(0,18) +
-          ("-------------" + pad).slice(0,18) +
-          ("------------" +pad).slice(0,18) 
+        ("---------------" + pad).slice(0, 30) +
+          ("---------------" + pad).slice(0, 18) +
+          ("-------------" + pad).slice(0, 18) +
+          ("------------" + pad).slice(0, 18)
       );
       for (var i = 0; i < res.length; i++) {
-       console.log(
-          (res[i].department_name + pad).slice(0,30) +
-          ("$"+res[i].over_head_costs.toFixed(2) + pad).slice(0,18) +
-          ("$"+res[i].product_sales.toFixed(2) + pad).slice(0,18) +
-          ("$"+res[i].total_profit.toFixed(2) +pad).slice(0,18) 
+        console.log(
+          (res[i].department_name + pad).slice(0, 30) +
+            ("$" + res[i].over_head_costs.toFixed(2) + pad).slice(0, 18) +
+            ("$" + res[i].product_sales.toFixed(2) + pad).slice(0, 18) +
+            ("$" + res[i].total_profit.toFixed(2) + pad).slice(0, 18)
         );
       }
-      if (nextFunc){
-        if (params){
+      console.log(
+        ("---------------" + pad).slice(0, 30) +
+          ("---------------" + pad).slice(0, 18) +
+          ("-------------" + pad).slice(0, 18) +
+          ("------------" + pad).slice(0, 18) +
+          "\n"
+      );
+      if (nextFunc) {
+        if (params) {
           nextFunc(params);
         } else {
           nextFunc();
@@ -300,31 +308,19 @@ function queryReport(query, nextFunc, params) {
   );
 } // queryReport
 
-
 // function which prompts the user for what action they should take
-function XXXwhichDept(depts) {
-  var dept = "";
-  inquirer
-    .prompt({
-      name: "dept",
-      type: "checkbox",
-      message: "What deparment(s) would like to see?",
-      choices: depts
-    })
-    .then(function(answer) {
-      dept = answer.dept;
-      console.log(dept + " -- Okay ...\n");
-      queryDeptProducts(dept);
-    });
-} //whichDept
 
-function whichDept(depts, nextFunc) {
+function promptDept(depts, listType, nextFunc) {
   var dept = "";
+  var typeOpt = "checkbox";
+  if (listType) {
+    typeOpt = listType;
+  }
   inquirer
     .prompt({
       name: "dept",
-      type: "list",
-      message: products.managerMode
+      type: typeOpt,
+      message: products.managerMode || products.supervisorMode
         ? "What deparment would like to manage?"
         : "What deparment would like to shop?",
       choices: depts
@@ -338,10 +334,10 @@ function whichDept(depts, nextFunc) {
         queryDeptProducts(dept);
       }
     });
-} //whichDept
+} //promptDept
 
 // function which prompts the user for what action they should take
-function whichProduct(products) {
+function promptProduct(products) {
   // var productChoice = "";
   var question = products.productQuestion();
   var header = products.showHeader();
@@ -359,7 +355,7 @@ function whichProduct(products) {
       {
         name: "qty",
         type: "input",
-        message: products.managerMode
+        message: products.managerMode  || products.supervisorMode
           ? "How many would like to add to stock? "
           : "How many would like buy?", //+ products[Prod.getIdFromAns(product)].qty,
         validate: function(value) {
@@ -376,23 +372,23 @@ function whichProduct(products) {
     ])
     .then(function(answer) {
       //product = answer.product;
-      console.log(answer.product);
-      console.log(answer.qty);
+      // console.log(answer.product);
+      // console.log(answer.qty);
       var item_id = products.getIdFromAns(answer.product);
       var index = products.myFindIndexById(item_id);
       // out of stock? then choose different product
-      if (products.managerMode) {
+      if (products.managerMode || products.supervisorMode) {
         products.list[index].restockItem(answer.qty);
-        console.log("Updated");
+        // console.log("Updated");
         queryProductUpdate(products.list[index]);
-        actionPrompt();
+        rootMenu();
       } else {
         if (products.list[index].qty < parseInt(answer.qty)) {
           console.log(
             "Sorry, There is only " + products.list[index].qty + " in stock \n"
           );
           //changeQtyPrompt(products, index, qty);
-          whichProduct(products);
+          promptProduct(products);
         }
         // choose zero qty then query for new product categoty
         else if (parseInt(answer.qty) === 0) {
@@ -402,10 +398,10 @@ function whichProduct(products) {
           //   products.pop();
           // }
           // products = [];
-          queryCategories();
+          queryDepartments();
         } else {
           // deduct qty from stock - then choose new category;
-          console.log("Purchased:");
+          console.log("\nPurchased:");
           var total = products.list[index].sellItem(parseInt(answer.qty));
 
           console.log(
@@ -420,11 +416,11 @@ function whichProduct(products) {
           console.log("  Total: $" + total.toFixed(2) + "\n\n");
           queryProductUpdate(products.list[index]);
 
-          queryCategories();
+          rootMenu();
         }
       }
     });
-} //whichProduct
+} //promptProduct
 
 function promptAddDept() {
   var dept = "";
@@ -444,6 +440,7 @@ function promptAddDept() {
     ])
     .then(function(answer) {
       dept = answer.dept;
+      promptAddProduct(dept);
 
       // based on their answer, either call the bid or the post functions
       // if (answer.postOrBid.toUpperCase() === "POST") {
@@ -473,7 +470,7 @@ function displayProducts(products) {
   } else {
     console.log("No products found");
   }
-  actionPrompt();
+  rootMenu();
 } // displayProducts
 
 function promptAddProduct(dept, choices) {
@@ -560,15 +557,14 @@ function promptAddProduct(dept, choices) {
         0, // qtySold,
         0 //grossRevenue
       );
-      queryProductCreate(p, actionPrompt);
+      queryProductCreate(p, rootMenu);
     });
 } //promptAddProduct
 
-
-var query = "select department_name, "  
-+ " sum(stock_quantity * price) as over_head_costs,"  
-+ " sum(gross_revenue) as product_sales,"  
-+ " sum(gross_revenue) - sum(stock_quantity * price) as total_profit"
-+ " from products"
-+ " group by department_name";
-
+var query =
+  "select department_name, " +
+  " sum(stock_quantity * price) as over_head_costs," +
+  " sum(gross_revenue) as product_sales," +
+  " sum(gross_revenue) - sum(stock_quantity * price) as total_profit" +
+  " from products" +
+  " group by department_name";
